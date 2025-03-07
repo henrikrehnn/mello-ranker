@@ -3,22 +3,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 import string
 import os
-from flask_cors import CORS
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.config['SECRET_KEY'] = 'melodifestivalen2025'
-CORS(app)
-
-# Initialize Socket.IO with eventlet
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='eventlet',
-    engineio_options={
-        'transports': ['websocket', 'polling'],
-        'path': '/socket.io'
-    }
-)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 rooms = {}
 
@@ -109,5 +97,4 @@ def calculate_total_scores(votes):
     return total_scores
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
-    socketio.run(app, port=port, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, port=5001, debug=True)
