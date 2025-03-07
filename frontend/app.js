@@ -1,4 +1,7 @@
-const socket = io('https://mello-ranker.vercel.app');
+const socket = io('https://mello-ranker.vercel.app', {
+    transports: ['polling'],
+    upgrade: false
+});
 let isHost = false;
 let currentEntries = [];
 let currentRoomCode = '';
