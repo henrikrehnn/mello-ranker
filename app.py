@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.config['SECRET_KEY'] = 'melodifestivalen2025'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 rooms = {}
 
@@ -97,4 +97,5 @@ def calculate_total_scores(votes):
     return total_scores
 
 if __name__ == '__main__':
-    socketio.run(app, port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    socketio.run(app, port=port, debug=False)
