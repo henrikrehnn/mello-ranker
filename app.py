@@ -54,7 +54,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         "entries": entries,
                         "votes": {},
                         "revealed": False,
-                        "host": websocket.client.host
+                        "host": websocket.client.host,
+                        "clients": [websocket.client.host]
                     }
 
                     await websocket.send_text(json.dumps({
@@ -73,6 +74,9 @@ async def websocket_endpoint(websocket: WebSocket):
                             "error": "Invalid room code"
                         }))
                         continue
+
+                    if websocket.client.host not in rooms[code]["clients"]:
+                        rooms[code]["clients"].append(websocket.client.host)
 
                     await websocket.send_text(json.dumps({
                         "event": "joined_room",
@@ -144,7 +148,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 }))
 
     except WebSocketDisconnect:
-        pass
+        for room in rooms.values():
+            if websocket.client.host in room["clients"]:
+                room["clients"].remove(websocket.client.host)
+                if not room["clients"]:
+                    del rooms[room["code"]]
 
 def calculate_total_scores(votes: Dict) -> Dict:
     total_scores = {}

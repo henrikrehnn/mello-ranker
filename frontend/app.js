@@ -69,62 +69,67 @@ async function createConnection() {
         socket.close();
     }
     
-    socket = new WebSocket('wss://mello-ranker.vercel.app/ws');
-    
-    socket.onopen = () => {
-        console.log('Connected to server');
-        // Reconnect any pending operations
-        if (currentRoomCode) {
-            socket.send(JSON.stringify({
-                event: 'join_room',
-                code: currentRoomCode
-            }));
-        }
-    };
-    
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+    try {
+        socket = new WebSocket('wss://mello-ranker.vercel.app/ws');
         
-        switch (data.event) {
-            case 'room_created':
-                currentRoomCode = data.data.code;
-                currentEntries = data.data.entries;
-                showScreen('voting');
-                setupVotingArea(currentEntries);
-                break;
+        socket.onopen = () => {
+            console.log('Connected to server');
+            // Reconnect any pending operations
+            if (currentRoomCode) {
+                socket.send(JSON.stringify({
+                    event: 'join_room',
+                    code: currentRoomCode
+                }));
+            }
+        };
+        
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
             
-            case 'joined_room':
-                currentRoomCode = data.data.code;
-                currentEntries = data.data.entries;
-                isHost = data.data.is_host;
-                showScreen('voting');
-                setupVotingArea(currentEntries);
-                break;
-            
-            case 'votes_submitted':
-                // Handle vote submission
-                break;
-            
-            case 'reveal_scores':
-                showResults(data.data.scores);
-                break;
-            
-            case 'error':
-                alert(data.error);
-                break;
-        }
-    };
-    
-    socket.onclose = () => {
-        console.log('Disconnected from server');
-        socket = null;
-        // Try to reconnect after a short delay
-        setTimeout(createConnection, 5000);
-    };
-    
-    socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
+            switch (data.event) {
+                case 'room_created':
+                    currentRoomCode = data.data.code;
+                    currentEntries = data.data.entries;
+                    showScreen('voting');
+                    setupVotingArea(currentEntries);
+                    break;
+                
+                case 'joined_room':
+                    currentRoomCode = data.data.code;
+                    currentEntries = data.data.entries;
+                    isHost = data.data.is_host;
+                    showScreen('voting');
+                    setupVotingArea(currentEntries);
+                    break;
+                
+                case 'votes_submitted':
+                    // Handle vote submission
+                    break;
+                
+                case 'reveal_scores':
+                    showResults(data.data.scores);
+                    break;
+                
+                case 'error':
+                    alert(data.error);
+                    break;
+            }
+        };
+        
+        socket.onclose = () => {
+            console.log('Disconnected from server');
+            socket = null;
+            // Try to reconnect after a short delay
+            setTimeout(createConnection, 5000);
+        };
+        
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+        alert('Failed to connect to the server. Please try again later.');
+    }
 }
 
 async function createRoom() {
@@ -143,10 +148,15 @@ async function createRoom() {
             }, 100);
         });
         
-        socket.send(JSON.stringify({
-            event: 'create_room',
-            entries: entries
-        }));
+        try {
+            socket.send(JSON.stringify({
+                event: 'create_room',
+                entries: entries
+            }));
+        } catch (error) {
+            console.error('Failed to send create_room message:', error);
+            alert('Failed to create room. Please check your connection and try again.');
+        }
     }
 }
 
@@ -164,10 +174,15 @@ async function joinRoom() {
             }, 100);
         });
         
-        socket.send(JSON.stringify({
-            event: 'join_room',
-            code: code
-        }));
+        try {
+            socket.send(JSON.stringify({
+                event: 'join_room',
+                code: code
+            }));
+        } catch (error) {
+            console.error('Failed to send join_room message:', error);
+            alert('Failed to join room. Please check your connection and try again.');
+        }
     }
 }
 
@@ -252,11 +267,16 @@ async function submitVotes() {
             }, 100);
         });
         
-        socket.send(JSON.stringify({
-            event: 'submit_votes',
-            room: currentRoomCode,
-            votes: votes
-        }));
+        try {
+            socket.send(JSON.stringify({
+                event: 'submit_votes',
+                room: currentRoomCode,
+                votes: votes
+            }));
+        } catch (error) {
+            console.error('Failed to send submit_votes message:', error);
+            alert('Failed to submit votes. Please check your connection and try again.');
+        }
     }
 }
 
@@ -272,10 +292,15 @@ async function revealScores() {
             }, 100);
         });
         
-        socket.send(JSON.stringify({
-            event: 'reveal_scores',
-            room: currentRoomCode
-        }));
+        try {
+            socket.send(JSON.stringify({
+                event: 'reveal_scores',
+                room: currentRoomCode
+            }));
+        } catch (error) {
+            console.error('Failed to send reveal_scores message:', error);
+            alert('Failed to reveal scores. Please check your connection and try again.');
+        }
     }
 }
 
