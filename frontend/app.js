@@ -1,5 +1,5 @@
 const socket = io('https://mello-ranker.vercel.app', {
-    transports: ['polling'],
+    transports: ['websocket'],
     upgrade: false,
     path: '/socket.io'
 });
