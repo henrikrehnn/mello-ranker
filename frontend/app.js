@@ -1,4 +1,4 @@
-const socket = io();
+let socket = null;
 let isHost = false;
 let currentEntries = [];
 let currentRoomCode = '';
@@ -64,18 +64,77 @@ function addEntryToList(entry) {
     list.appendChild(item);
 }
 
-function createRoom() {
+async function createConnection() {
+    if (socket) {
+        socket.close();
+    }
+    
+    socket = new WebSocket('wss://mello-ranker.vercel.app/ws');
+    
+    socket.onopen = () => {
+        console.log('Connected to server');
+    };
+    
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        switch (data.event) {
+            case 'room_created':
+                currentRoomCode = data.data.code;
+                currentEntries = data.data.entries;
+                showScreen('voting');
+                setupVotingArea(currentEntries);
+                break;
+            
+            case 'joined_room':
+                currentRoomCode = data.data.code;
+                currentEntries = data.data.entries;
+                isHost = data.data.is_host;
+                showScreen('voting');
+                setupVotingArea(currentEntries);
+                break;
+            
+            case 'votes_submitted':
+                // Handle vote submission
+                break;
+            
+            case 'reveal_scores':
+                showResults(data.data.scores);
+                break;
+            
+            case 'error':
+                alert(data.error);
+                break;
+        }
+    };
+    
+    socket.onclose = () => {
+        console.log('Disconnected from server');
+        socket = null;
+    };
+}
+
+async function createRoom() {
     const entries = Array.from(document.getElementById('entry-list').children)
         .map(item => item.children[1].textContent);
+    
     if (entries.length > 0) {
-        socket.emit('create_room', { entries });
+        await createConnection();
+        socket.send(JSON.stringify({
+            event: 'create_room',
+            entries: entries
+        }));
     }
 }
 
-function joinRoom() {
+async function joinRoom() {
     const code = document.getElementById('join-code').value.trim().toUpperCase();
     if (code) {
-        socket.emit('join_room', { code });
+        await createConnection();
+        socket.send(JSON.stringify({
+            event: 'join_room',
+            code: code
+        }));
     }
 }
 
@@ -142,13 +201,29 @@ function updatePoints() {
     document.querySelector('.dragging')?.classList.remove('dragging');
 }
 
-function submitVotes() {
+async function submitVotes() {
     const votes = {};
     document.querySelectorAll('.entry-item').forEach((item, index) => {
         const entry = item.querySelector('.entry-text').textContent;
         votes[entry] = getPoints(index);
     });
-    socket.emit('submit_votes', { votes, room: currentRoomCode });
+    
+    if (socket) {
+        socket.send(JSON.stringify({
+            event: 'submit_votes',
+            room: currentRoomCode,
+            votes: votes
+        }));
+    }
+}
+
+async function revealScores() {
+    if (socket) {
+        socket.send(JSON.stringify({
+            event: 'reveal_scores',
+            room: currentRoomCode
+        }));
+    }
 }
 
 function showResults(scores) {
@@ -222,34 +297,47 @@ function showResults(scores) {
 }
 
 // Socket event handlers
-socket.on('room_created', data => {
-    currentRoomCode = data.code;
-    currentEntries = data.entries;
-    showScreen('voting');
-    document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
-    setupVotingArea(currentEntries);
-    if (isHost) {
-        document.getElementById('host-controls').classList.remove('d-none');
+socket.onopen = () => {
+    console.log('Connected to server');
+};
+
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    
+    switch (data.event) {
+        case 'room_created':
+            currentRoomCode = data.data.code;
+            currentEntries = data.data.entries;
+            showScreen('voting');
+            document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
+            setupVotingArea(currentEntries);
+            if (isHost) {
+                document.getElementById('host-controls').classList.remove('d-none');
+            }
+            break;
+        
+        case 'joined_room':
+            currentRoomCode = data.data.code;
+            currentEntries = data.data.entries;
+            showScreen('voting');
+            document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
+            setupVotingArea(currentEntries);
+            break;
+        
+        case 'error':
+            alert(data.message);
+            break;
+        
+        case 'reveal_scores':
+            showResults(data.scores);
+            break;
     }
-});
+};
 
-socket.on('joined_room', data => {
-    currentRoomCode = data.code;
-    currentEntries = data.entries;
-    showScreen('voting');
-    document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
-    setupVotingArea(currentEntries);
-});
-
-socket.on('error', data => {
-    alert(data.message);
-});
-
-socket.on('reveal_scores', data => {
-    showResults(data.scores);
-});
+socket.onclose = () => {
+    console.log('Disconnected from server');
+    socket = null;
+};
 
 // Add reveal scores button handler for host
-document.getElementById('reveal-scores-btn')?.addEventListener('click', () => {
-    socket.emit('reveal_scores', { room: currentRoomCode });
-});
+document.getElementById('reveal-scores-btn')?.addEventListener('click', revealScores);
