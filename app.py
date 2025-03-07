@@ -3,15 +3,19 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 import string
 import os
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.config['SECRET_KEY'] = 'melodifestivalen2025'
+CORS(app)
+
+# Initialize Socket.IO with eventlet
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
     engineio_options={
-        'transports': ['websocket'],
+        'transports': ['websocket', 'polling'],
         'path': '/socket.io'
     }
 )
