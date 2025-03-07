@@ -5,6 +5,7 @@ import random
 import string
 import os
 from typing import Dict, List
+import json
 
 app = FastAPI()
 
@@ -31,87 +32,116 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            data = await websocket.receive_json()
-            event = data.get("event")
-            
-            if event == "create_room":
-                entries = data.get("entries", [])
-                if not entries:
-                    await websocket.send_json({"error": "No entries provided"})
-                    continue
+            data = await websocket.receive_text()
+            try:
+                event_data = json.loads(data)
+                event = event_data.get("event")
+                
+                if event == "create_room":
+                    entries = event_data.get("entries", [])
+                    if not entries:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "No entries provided"
+                        }))
+                        continue
 
-                room_code = generate_room_code()
-                while room_code in rooms:
                     room_code = generate_room_code()
+                    while room_code in rooms:
+                        room_code = generate_room_code()
 
-                rooms[room_code] = {
-                    "entries": entries,
-                    "votes": {},
-                    "revealed": False,
-                    "host": websocket.client.host
-                }
-
-                await websocket.send_json({
-                    "event": "room_created",
-                    "data": {
-                        "code": room_code,
-                        "entries": entries
+                    rooms[room_code] = {
+                        "entries": entries,
+                        "votes": {},
+                        "revealed": False,
+                        "host": websocket.client.host
                     }
-                })
 
-            elif event == "join_room":
-                code = data.get("code")
-                if not code or code not in rooms:
-                    await websocket.send_json({"error": "Invalid room code"})
-                    continue
+                    await websocket.send_text(json.dumps({
+                        "event": "room_created",
+                        "data": {
+                            "code": room_code,
+                            "entries": entries
+                        }
+                    }))
 
-                await websocket.send_json({
-                    "event": "joined_room",
-                    "data": {
-                        "code": code,
-                        "entries": rooms[code]["entries"],
-                        "is_host": websocket.client.host == rooms[code]["host"]
-                    }
-                })
+                elif event == "join_room":
+                    code = event_data.get("code")
+                    if not code or code not in rooms:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "Invalid room code"
+                        }))
+                        continue
 
-            elif event == "submit_votes":
-                room = data.get("room")
-                votes = data.get("votes")
-                
-                if not room or room not in rooms:
-                    await websocket.send_json({"error": "Invalid room"})
-                    continue
-                
-                if not votes:
-                    await websocket.send_json({"error": "No votes provided"})
-                    continue
+                    await websocket.send_text(json.dumps({
+                        "event": "joined_room",
+                        "data": {
+                            "code": code,
+                            "entries": rooms[code]["entries"],
+                            "is_host": websocket.client.host == rooms[code]["host"]
+                        }
+                    }))
 
-                rooms[room]["votes"][websocket.client.host] = votes
-                await websocket.send_json({
-                    "event": "votes_submitted",
-                    "data": {"message": "Votes submitted successfully"}
-                })
+                elif event == "submit_votes":
+                    room = event_data.get("room")
+                    votes = event_data.get("votes")
+                    
+                    if not room or room not in rooms:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "Invalid room"
+                        }))
+                        continue
+                    
+                    if not votes:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "No votes provided"
+                        }))
+                        continue
 
-            elif event == "reveal_scores":
-                room = data.get("room")
-                
-                if not room or room not in rooms:
-                    await websocket.send_json({"error": "Invalid room"})
-                    continue
+                    rooms[room]["votes"][websocket.client.host] = votes
+                    await websocket.send_text(json.dumps({
+                        "event": "votes_submitted",
+                        "data": {"message": "Votes submitted successfully"}
+                    }))
 
-                if not rooms[room]["votes"]:
-                    await websocket.send_json({"error": "No votes submitted yet"})
-                    continue
+                elif event == "reveal_scores":
+                    room = event_data.get("room")
+                    
+                    if not room or room not in rooms:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "Invalid room"
+                        }))
+                        continue
 
-                if websocket.client.host != rooms[room]["host"]:
-                    await websocket.send_json({"error": "Only the host can reveal scores"})
-                    continue
+                    if not rooms[room]["votes"]:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "No votes submitted yet"
+                        }))
+                        continue
 
-                total_scores = calculate_total_scores(rooms[room]["votes"])
-                await websocket.send_json({
-                    "event": "reveal_scores",
-                    "data": {"scores": total_scores}
-                })
+                    if websocket.client.host != rooms[room]["host"]:
+                        await websocket.send_text(json.dumps({
+                            "event": "error",
+                            "error": "Only the host can reveal scores"
+                        }))
+                        continue
+
+                    total_scores = calculate_total_scores(rooms[room]["votes"])
+                    await websocket.send_text(json.dumps({
+                        "event": "reveal_scores",
+                        "data": {"scores": total_scores}
+                    }))
+
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "event": "error",
+                    "error": "Invalid JSON format"
+                }))
 
     except WebSocketDisconnect:
         pass

@@ -133,6 +133,16 @@ async function createRoom() {
     
     if (entries.length > 0) {
         await createConnection();
+        // Wait for connection to be established
+        await new Promise((resolve) => {
+            const interval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    clearInterval(interval);
+                    resolve(true);
+                }
+            }, 100);
+        });
+        
         socket.send(JSON.stringify({
             event: 'create_room',
             entries: entries
@@ -144,6 +154,16 @@ async function joinRoom() {
     const code = document.getElementById('join-code').value.trim().toUpperCase();
     if (code) {
         await createConnection();
+        // Wait for connection to be established
+        await new Promise((resolve) => {
+            const interval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    clearInterval(interval);
+                    resolve(true);
+                }
+            }, 100);
+        });
+        
         socket.send(JSON.stringify({
             event: 'join_room',
             code: code
@@ -222,6 +242,16 @@ async function submitVotes() {
     });
     
     if (socket) {
+        // Wait for connection to be established
+        await new Promise((resolve) => {
+            const interval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    clearInterval(interval);
+                    resolve(true);
+                }
+            }, 100);
+        });
+        
         socket.send(JSON.stringify({
             event: 'submit_votes',
             room: currentRoomCode,
@@ -232,6 +262,16 @@ async function submitVotes() {
 
 async function revealScores() {
     if (socket) {
+        // Wait for connection to be established
+        await new Promise((resolve) => {
+            const interval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    clearInterval(interval);
+                    resolve(true);
+                }
+            }, 100);
+        });
+        
         socket.send(JSON.stringify({
             event: 'reveal_scores',
             room: currentRoomCode
