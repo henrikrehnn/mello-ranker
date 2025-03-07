@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import random
 import string
 import os
@@ -16,14 +17,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve static files
+app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+
 rooms: Dict[str, Dict] = {}
 
 def generate_room_code() -> str:
     return ''.join(random.choices(string.ascii_uppercase, k=4))
-
-@app.get("/")
-async def root():
-    return "Hello World"
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
