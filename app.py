@@ -97,4 +97,4 @@ def calculate_total_scores(votes):
     return total_scores
 
 if __name__ == '__main__':
-    socketio.run(app, port=5001, debug=True)
+    socketio.run(app, port=5001)
