@@ -73,6 +73,13 @@ async function createConnection() {
     
     socket.onopen = () => {
         console.log('Connected to server');
+        // Reconnect any pending operations
+        if (currentRoomCode) {
+            socket.send(JSON.stringify({
+                event: 'join_room',
+                code: currentRoomCode
+            }));
+        }
     };
     
     socket.onmessage = (event) => {
@@ -111,6 +118,12 @@ async function createConnection() {
     socket.onclose = () => {
         console.log('Disconnected from server');
         socket = null;
+        // Try to reconnect after a short delay
+        setTimeout(createConnection, 5000);
+    };
+    
+    socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
     };
 }
 
@@ -295,49 +308,6 @@ function showResults(scores) {
     });
     scoreboard.appendChild(remainingEntries);
 }
-
-// Socket event handlers
-socket.onopen = () => {
-    console.log('Connected to server');
-};
-
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    
-    switch (data.event) {
-        case 'room_created':
-            currentRoomCode = data.data.code;
-            currentEntries = data.data.entries;
-            showScreen('voting');
-            document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
-            setupVotingArea(currentEntries);
-            if (isHost) {
-                document.getElementById('host-controls').classList.remove('d-none');
-            }
-            break;
-        
-        case 'joined_room':
-            currentRoomCode = data.data.code;
-            currentEntries = data.data.entries;
-            showScreen('voting');
-            document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
-            setupVotingArea(currentEntries);
-            break;
-        
-        case 'error':
-            alert(data.message);
-            break;
-        
-        case 'reveal_scores':
-            showResults(data.scores);
-            break;
-    }
-};
-
-socket.onclose = () => {
-    console.log('Disconnected from server');
-    socket = null;
-};
 
 // Add reveal scores button handler for host
 document.getElementById('reveal-scores-btn')?.addEventListener('click', revealScores);
