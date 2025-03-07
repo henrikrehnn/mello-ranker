@@ -1,6 +1,7 @@
 const socket = io('https://mello-ranker.vercel.app', {
     transports: ['polling'],
-    upgrade: false
+    upgrade: false,
+    path: '/socket.io'
 });
 let isHost = false;
 let currentEntries = [];
