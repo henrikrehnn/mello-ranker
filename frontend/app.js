@@ -1,4 +1,4 @@
-let socket = null;
+const socket = io();
 let isHost = false;
 let currentEntries = [];
 let currentRoomCode = '';
@@ -64,125 +64,18 @@ function addEntryToList(entry) {
     list.appendChild(item);
 }
 
-async function createConnection() {
-    if (socket) {
-        socket.close();
-    }
-    
-    try {
-        socket = new WebSocket('wss://mello-ranker.vercel.app/ws');
-        
-        socket.onopen = () => {
-            console.log('Connected to server');
-            // Reconnect any pending operations
-            if (currentRoomCode) {
-                socket.send(JSON.stringify({
-                    event: 'join_room',
-                    code: currentRoomCode
-                }));
-            }
-        };
-        
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            switch (data.event) {
-                case 'room_created':
-                    currentRoomCode = data.data.code;
-                    currentEntries = data.data.entries;
-                    showScreen('voting');
-                    setupVotingArea(currentEntries);
-                    break;
-                
-                case 'joined_room':
-                    currentRoomCode = data.data.code;
-                    currentEntries = data.data.entries;
-                    isHost = data.data.is_host;
-                    showScreen('voting');
-                    setupVotingArea(currentEntries);
-                    break;
-                
-                case 'votes_submitted':
-                    // Handle vote submission
-                    break;
-                
-                case 'reveal_scores':
-                    showResults(data.data.scores);
-                    break;
-                
-                case 'error':
-                    alert(data.error);
-                    break;
-            }
-        };
-        
-        socket.onclose = () => {
-            console.log('Disconnected from server');
-            socket = null;
-            // Try to reconnect after a short delay
-            setTimeout(createConnection, 5000);
-        };
-        
-        socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
-    } catch (error) {
-        console.error('Failed to create WebSocket connection:', error);
-        alert('Failed to connect to the server. Please try again later.');
-    }
-}
-
-async function createRoom() {
+function createRoom() {
     const entries = Array.from(document.getElementById('entry-list').children)
         .map(item => item.children[1].textContent);
-    
     if (entries.length > 0) {
-        await createConnection();
-        // Wait for connection to be established
-        await new Promise((resolve) => {
-            const interval = setInterval(() => {
-                if (socket?.readyState === WebSocket.OPEN) {
-                    clearInterval(interval);
-                    resolve(true);
-                }
-            }, 100);
-        });
-        
-        try {
-            socket.send(JSON.stringify({
-                event: 'create_room',
-                entries: entries
-            }));
-        } catch (error) {
-            console.error('Failed to send create_room message:', error);
-            alert('Failed to create room. Please check your connection and try again.');
-        }
+        socket.emit('create_room', { entries });
     }
 }
 
-async function joinRoom() {
+function joinRoom() {
     const code = document.getElementById('join-code').value.trim().toUpperCase();
     if (code) {
-        await createConnection();
-        // Wait for connection to be established
-        await new Promise((resolve) => {
-            const interval = setInterval(() => {
-                if (socket?.readyState === WebSocket.OPEN) {
-                    clearInterval(interval);
-                    resolve(true);
-                }
-            }, 100);
-        });
-        
-        try {
-            socket.send(JSON.stringify({
-                event: 'join_room',
-                code: code
-            }));
-        } catch (error) {
-            console.error('Failed to send join_room message:', error);
-            alert('Failed to join room. Please check your connection and try again.');
-        }
+        socket.emit('join_room', { code });
     }
 }
 
@@ -249,59 +142,13 @@ function updatePoints() {
     document.querySelector('.dragging')?.classList.remove('dragging');
 }
 
-async function submitVotes() {
+function submitVotes() {
     const votes = {};
     document.querySelectorAll('.entry-item').forEach((item, index) => {
         const entry = item.querySelector('.entry-text').textContent;
         votes[entry] = getPoints(index);
     });
-    
-    if (socket) {
-        // Wait for connection to be established
-        await new Promise((resolve) => {
-            const interval = setInterval(() => {
-                if (socket?.readyState === WebSocket.OPEN) {
-                    clearInterval(interval);
-                    resolve(true);
-                }
-            }, 100);
-        });
-        
-        try {
-            socket.send(JSON.stringify({
-                event: 'submit_votes',
-                room: currentRoomCode,
-                votes: votes
-            }));
-        } catch (error) {
-            console.error('Failed to send submit_votes message:', error);
-            alert('Failed to submit votes. Please check your connection and try again.');
-        }
-    }
-}
-
-async function revealScores() {
-    if (socket) {
-        // Wait for connection to be established
-        await new Promise((resolve) => {
-            const interval = setInterval(() => {
-                if (socket?.readyState === WebSocket.OPEN) {
-                    clearInterval(interval);
-                    resolve(true);
-                }
-            }, 100);
-        });
-        
-        try {
-            socket.send(JSON.stringify({
-                event: 'reveal_scores',
-                room: currentRoomCode
-            }));
-        } catch (error) {
-            console.error('Failed to send reveal_scores message:', error);
-            alert('Failed to reveal scores. Please check your connection and try again.');
-        }
-    }
+    socket.emit('submit_votes', { votes, room: currentRoomCode });
 }
 
 function showResults(scores) {
@@ -374,5 +221,35 @@ function showResults(scores) {
     scoreboard.appendChild(remainingEntries);
 }
 
+// Socket event handlers
+socket.on('room_created', data => {
+    currentRoomCode = data.code;
+    currentEntries = data.entries;
+    showScreen('voting');
+    document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
+    setupVotingArea(currentEntries);
+    if (isHost) {
+        document.getElementById('host-controls').classList.remove('d-none');
+    }
+});
+
+socket.on('joined_room', data => {
+    currentRoomCode = data.code;
+    currentEntries = data.entries;
+    showScreen('voting');
+    document.getElementById('room-code-display').textContent = `Room Code: ${currentRoomCode}`;
+    setupVotingArea(currentEntries);
+});
+
+socket.on('error', data => {
+    alert(data.message);
+});
+
+socket.on('reveal_scores', data => {
+    showResults(data.scores);
+});
+
 // Add reveal scores button handler for host
-document.getElementById('reveal-scores-btn')?.addEventListener('click', revealScores);
+document.getElementById('reveal-scores-btn')?.addEventListener('click', () => {
+    socket.emit('reveal_scores', { room: currentRoomCode });
+});

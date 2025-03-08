@@ -1,2 +1,4 @@
 pip install -r requirements.txt
-apt-get install build-essential
+sudo apt install python3-venv
+python3 -m venv mello
+source mello/bin/activate
