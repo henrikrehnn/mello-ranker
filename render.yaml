@@ -1,0 +1,10 @@
+services:
+  - name: flask-websocket
+    type: web
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn -k eventlet -w 1 app:app"
+    envVars:
+      - key: PORT
+        value: 10000
